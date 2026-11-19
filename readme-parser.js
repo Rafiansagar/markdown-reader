@@ -52,6 +52,15 @@
 		return line.match(/^\s*/)[0].length;
 	}
 
+	// Options for the render in progress, set by md(text, opts):
+	//   gfm:     GitHub-style Markdown (real heading levels, task lists, setext headings, no "= x =")
+	//   resolve: function (url, 'image'|'link') -> url, for relative paths
+	var OPTS = {};
+
+	function resolveUrl(url, kind) {
+		return safeUrl(OPTS.resolve ? OPTS.resolve(url, kind) : url);
+	}
+
 	/* ---------- inline markdown ---------- */
 
 	function emphasis(t) {
@@ -76,11 +85,11 @@
 		});
 		// images
 		s = s.replace(/!\[([^\]]*)\]\(\s*([^()\s]+(?:\([^()\s]*\)[^()\s]*)*)(?:\s+"[^"]*")?\s*\)/g, function (_, alt, url) {
-			return hold('<img src="' + esc(safeUrl(url)) + '" alt="' + esc(alt) + '">');
+			return hold('<img src="' + esc(resolveUrl(url, 'image')) + '" alt="' + esc(alt) + '">');
 		});
 		// links
 		s = s.replace(/\[([^\]]+)\]\(\s*([^()\s]+(?:\([^()\s]*\)[^()\s]*)*)(?:\s+"([^"]*)")?\s*\)/g, function (_, text, url, title) {
-			return hold('<a href="' + esc(safeUrl(url)) + '"' + (title ? ' title="' + esc(title) + '"' : '') +
+			return hold('<a href="' + esc(resolveUrl(url, 'link')) + '"' + (title ? ' title="' + esc(title) + '"' : '') +
 				'>' + emphasis(esc(text)) + '</a>');
 		});
 		// <https://autolinks>
@@ -114,8 +123,10 @@
 		tableSep: /^\s*\|?\s*:?-{2,}:?\s*(\|\s*:?-{2,}:?\s*)*\|?\s*$/
 	};
 
+	var SETEXT = /^\s{0,3}(=+|-+)\s*$/;
+
 	function startsBlock(line) {
-		return RE.fence.test(line) || RE.wpHeading.test(line) || RE.mdHeading.test(line) ||
+		return RE.fence.test(line) || (!OPTS.gfm && RE.wpHeading.test(line)) || RE.mdHeading.test(line) ||
 			RE.hr.test(line) || RE.quote.test(line) || RE.list.test(line);
 	}
 
@@ -187,9 +198,14 @@
 		}
 
 		var html = items.map(function (it) {
+			var task = OPTS.gfm && it.lines[0].match(/^\[([ xX])\]\s+/);
+			if (task) it.lines[0] = it.lines[0].slice(task[0].length);
 			var inner = md(it.lines.join('\n'));
 			if (!loose && it.lines.indexOf('') === -1) {
 				inner = inner.replace(/^<p>([\s\S]*?)<\/p>/, '$1');
+			}
+			if (task) {
+				return '<li class="task-list-item"><input type="checkbox" disabled' + (task[1] !== ' ' ? ' checked' : '') + '> ' + inner + '</li>';
 			}
 			return '<li>' + inner + '</li>';
 		}).join('');
@@ -199,7 +215,19 @@
 		return { html: '<' + tag + attrs + '>' + html + '</' + tag + '>', next: i };
 	}
 
-	function md(text) {
+	// md(text) renders with the current options; md(text, opts) sets them for this render.
+	function md(text, opts) {
+		if (opts === undefined) return blocks(text);
+		var prev = OPTS;
+		OPTS = opts || {};
+		try {
+			return blocks(text);
+		} finally {
+			OPTS = prev;
+		}
+	}
+
+	function blocks(text) {
 		var lines = String(text).replace(/\t/g, '    ').split('\n');
 		var out = [];
 		var i = 0;
@@ -215,18 +243,19 @@
 				i++;
 				while (i < lines.length && lines[i].trim().indexOf(m[1]) !== 0) buf.push(lines[i++]);
 				i++;
-				out.push('<pre><code>' + esc(dedent(buf).join('\n')) + '</code></pre>');
+				out.push('<pre><code' + (m[2] ? ' class="language-' + esc(m[2]) + '"' : '') + '>' + esc(dedent(buf).join('\n')) + '</code></pre>');
 				continue;
 			}
 
-			if ((m = line.match(RE.wpHeading))) {
+			if (!OPTS.gfm && (m = line.match(RE.wpHeading))) {
 				out.push('<h4>' + inline(m[1]) + '</h4>');
 				i++;
 				continue;
 			}
 
 			if ((m = line.match(RE.mdHeading))) {
-				var lvl = m[1].length <= 2 ? 3 : m[1].length === 3 ? 4 : 5;
+				// wordpress.org renders readme headings smaller; GitHub keeps the real level
+				var lvl = OPTS.gfm ? m[1].length : m[1].length <= 2 ? 3 : m[1].length === 3 ? 4 : 5;
 				out.push('<h' + lvl + '>' + inline(m[2]) + '</h' + lvl + '>');
 				i++;
 				continue;
@@ -277,8 +306,20 @@
 
 			var para = [line];
 			i++;
-			while (i < lines.length && lines[i].trim() && !startsBlock(lines[i])) para.push(lines[i++]);
-			out.push('<p>' + inline(para.map(function (l) { return l.replace(/^\s+/, ''); }).join('\n')) + '</p>');
+			while (i < lines.length && lines[i].trim()) {
+				if (OPTS.gfm && SETEXT.test(lines[i])) break;
+				if (startsBlock(lines[i])) break;
+				para.push(lines[i++]);
+			}
+			var paraHtml = inline(para.map(function (l) { return l.replace(/^\s+/, ''); }).join('\n'));
+			// "Title" underlined with === or --- is a heading in GitHub Markdown
+			if (OPTS.gfm && i < lines.length && SETEXT.test(lines[i])) {
+				var sl = lines[i].trim().charAt(0) === '=' ? 1 : 2;
+				i++;
+				out.push('<h' + sl + '>' + paraHtml + '</h' + sl + '>');
+				continue;
+			}
+			out.push('<p>' + paraHtml + '</p>');
 		}
 
 		return out.join('\n');
@@ -474,7 +515,73 @@
 		return out;
 	}
 
-	var api = { parse: parse, validate: validate, md: md, inline: inline, esc: esc };
+	/* ---------- Markdown checks (GitHub / Plain) ---------- */
+
+	function validateMarkdown(text, app) {
+		var out = [];
+		function add(level, msg) { out.push({ level: level, msg: msg }); }
+		function plural(n, w) { return n + ' ' + w + (n === 1 ? '' : 's'); }
+
+		var lines = String(text || '').replace(/\r\n?/g, '\n').split('\n');
+		if (!lines.join('').trim()) return out;
+
+		var fence = null;
+		var fenceLine = 0;
+		var noLang = 0;
+		var first = 0;
+		var h1 = 0;
+		var prev = 0;
+		var noAlt = 0;
+		var emptyLinks = 0;
+		var wpLines = 0;
+
+		lines.forEach(function (l, idx) {
+			var f = l.match(/^\s{0,3}(```+|~~~+)\s*([\w+-]*)/);
+			if (f) {
+				if (!fence) { fence = f[1]; fenceLine = idx + 1; if (!f[2]) noLang++; }
+				else if (f[1].charAt(0) === fence.charAt(0) && f[1].length >= fence.length) fence = null;
+				return;
+			}
+			if (fence) return;
+
+			var lvl = 0;
+			var h = l.match(/^\s{0,3}(#{1,6})\s+\S/);
+			var above = idx > 0 ? lines[idx - 1] : '';
+			var aboveIsText = above.trim() && !/^\s*([*+-]|\d+[.)])\s/.test(above) && !/^\s{0,3}#/.test(above);
+			if (h) lvl = h[1].length;
+			else if (/^\s{0,3}=+\s*$/.test(l) && aboveIsText) lvl = 1;
+			else if (/^\s{0,3}-+\s*$/.test(l) && aboveIsText) lvl = 2;
+
+			if (lvl) {
+				if (!first) first = lvl;
+				if (lvl === 1) h1++;
+				if (prev && lvl > prev + 1) add('info', 'Line ' + (idx + 1) + ': the heading jumps from H' + prev + ' to H' + lvl + '. Skipping levels makes the outline harder to follow.');
+				prev = lvl;
+			}
+
+			noAlt += (l.match(/!\[\s*\]\(/g) || []).length;
+			emptyLinks += (l.match(/(^|[^!])\[[^\]]+\]\(\s*\)/g) || []).length;
+			if (/^\s*={1,3}[^=].*={1,3}\s*$/.test(l)) wpLines++;
+		});
+
+		if (fence) add('warning', 'The code block opened on line ' + fenceLine + ' is never closed. Add a closing <code>' + esc(fence) + '</code>.');
+		if (!first) {
+			add(app === 'github' ? 'warning' : 'info', 'No heading. Start with <code># Project name</code> so the README has a title.');
+		} else if (first !== 1) {
+			add('info', 'The first heading is H' + first + '. READMEs usually start with one <code># Title</code>.');
+		}
+		if (h1 > 1) add('info', plural(h1, 'top-level heading') + ' (<code>#</code>). A README usually has just one.');
+		if (noAlt) add('warning', plural(noAlt, 'image') + ' without alt text. Write <code>![what it shows](url)</code> so screen readers can describe it.');
+		if (emptyLinks) add('warning', plural(emptyLinks, 'link') + ' with no URL.');
+		if (noLang && app === 'github') add('info', plural(noLang, 'code block') + ' without a language. Add one after the backticks, e.g. <code>```php</code>, so GitHub colours it.');
+		if (wpLines) add('info', plural(wpLines, 'line') + ' like <code>== Section ==</code>. That is WordPress readme syntax; Markdown shows it as plain text. Use <code>## Section</code>.');
+
+		var order = { error: 0, warning: 1, info: 2 };
+		out.sort(function (a, b) { return order[a.level] - order[b.level]; });
+		return out;
+	}
+
+	var api = { parse: parse, validate: validate, validateMarkdown: validateMarkdown, md: md, inline: inline, esc: esc };
 	if (typeof module !== 'undefined' && module.exports) module.exports = api;
 	else root.WPReadme = api;
 })(this);

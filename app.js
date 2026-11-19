@@ -17,7 +17,7 @@
 
 	var STORE_KEY = 'wp-readme-viewer:src';
 	var VIEW_KEY = 'wp-readme-viewer:view';
-	var state = { tab: 'details', openFaq: {} };
+	var state = { app: 'wp', side: 'readme', tab: 'details', openFaq: {}, base: null };
 	var assets = { loaded: false, banner: null, bannerHigh: null, icon: null, screenshots: {} };
 
 	var SAMPLE = [
@@ -91,6 +91,48 @@
 		'',
 		'= 2.3.1 =',
 		'Fixes a visible honeypot field in block themes. Recommended for everyone.',
+		''
+	].join('\n');
+
+	var SAMPLE_MD = [
+		'# Lightning Contact Form',
+		'',
+		'[![Build](https://img.shields.io/badge/build-passing-brightgreen)](https://example.com/actions) [![License: GPL v2](https://img.shields.io/badge/license-GPLv2-blue)](LICENSE)',
+		'',
+		'A fast, accessible contact form block for WordPress, with spam protection and email logging built in.',
+		'',
+		'## Features',
+		'',
+		'- Drag-and-drop fields inside the block editor',
+		'- Honeypot and time-trap spam protection',
+		'- Email log with resend, stored in your own database',
+		'',
+		'## Install',
+		'',
+		'```bash',
+		'composer require acme/lightning-contact-form',
+		'wp plugin activate lightning-contact-form',
+		'```',
+		'',
+		'## Roadmap',
+		'',
+		'- [x] Email log export to CSV',
+		'- [ ] File upload field',
+		'- [ ] Multi-step forms',
+		'',
+		'## Hooks',
+		'',
+		'| Filter | Receives | Use it to |',
+		'| --- | --- | --- |',
+		'| `lcf_recipients` | `array $to` | Add or change who gets each message |',
+		'| `lcf_spam_score` | `int $score` | Tune the spam threshold |',
+		'',
+		'> **Note**',
+		'> Requires WordPress 6.2 and PHP 7.4 or newer.',
+		'',
+		'## License',
+		'',
+		'GPL-2.0-or-later. See [LICENSE](LICENSE).',
 		''
 	].join('\n');
 
@@ -173,15 +215,60 @@
 		return html;
 	}
 
-	function render() {
-		var text = editor.get();
-		var r = W.parse(text);
-		var h = r.headers;
-		var name = r.name || 'Untitled plugin';
-		state.parsed = r;
+	/* ---------- apps: how the readme is read and shown ---------- */
 
-		/* validator */
-		var issues = W.validate(r, assets);
+	var APPS = {
+		wp: { ready: 'Ready for wordpress.org', file: 'readme.txt', prefer: 'txt' },
+		github: { ready: 'Ready for GitHub', file: 'README.md', prefer: 'md' },
+		plain: { ready: 'No problems found', file: 'README.md', prefer: 'md' }
+	};
+
+	function joinPath(dir, rel) {
+		var sep = dir.indexOf('\\') !== -1 ? '\\' : '/';
+		var parts = dir.split(/[\\/]/);
+		rel.split(/[\\/]/).forEach(function (p) {
+			if (p === '..') parts.pop();
+			else if (p && p !== '.') parts.push(p);
+		});
+		return parts.join(sep);
+	}
+
+	// Relative image/link paths in a Markdown README resolve against where the README lives.
+	function resolver() {
+		var base = state.base;
+		if (!base) return null;
+		return function (u, kind) {
+			if (/^([a-z][a-z0-9+.-]*:|#|\/\/)/i.test(u)) return u;
+			if (base.kind === 'url') {
+				try { return new URL(u, base.url).href; } catch (e) { return u; }
+			}
+			return kind === 'image' ? 'api/file?path=' + encodeURIComponent(joinPath(base.dir, u)) : u;
+		};
+	}
+
+	var BOOK_ICON = '<svg viewBox="0 0 16 16" aria-hidden="true"><path fill="currentColor" d="M0 1.75A.75.75 0 0 1 .75 1h4.253c1.227 0 2.317.59 3 1.501A3.743 3.743 0 0 1 11.006 1h4.245a.75.75 0 0 1 .75.75v10.5a.75.75 0 0 1-.75.75h-4.507a2.25 2.25 0 0 0-1.591.659l-.622.621a.75.75 0 0 1-1.06 0l-.622-.621A2.25 2.25 0 0 0 5.258 13H.75a.75.75 0 0 1-.75-.75Zm7.251 10.324.004-5.073-.002-2.253A2.25 2.25 0 0 0 5.003 2.5H1.5v9h3.757a3.75 3.75 0 0 1 1.994.574ZM8.755 4.75l-.004 7.322a3.752 3.752 0 0 1 1.992-.572H14.5v-9h-3.495a2.25 2.25 0 0 0-2.25 2.25Z"/></svg>';
+
+	function renderMarkdown(text) {
+		var app = state.app;
+		showChecks(W.validateMarkdown(text, app), APPS[app].ready);
+
+		if (!text.trim()) {
+			$preview.innerHTML = '<div class="md-empty">Paste a README on the left, choose a source at the top, or drop a file onto the page.</div>';
+			return;
+		}
+
+		var body = md(text, { gfm: true, resolve: resolver() });
+		var scroll = $preview.scrollTop;
+		$preview.innerHTML = app === 'github'
+			? '<div class="gh-page"><article class="gh-readme">' +
+				'<nav class="gh-readme-bar"><span class="gh-readme-tab">' + BOOK_ICON + 'README</span></nav>' +
+				'<div class="markdown-body">' + body + '</div></article></div>'
+			: '<article class="plain-doc">' + body + '</article>';
+		$preview.scrollTop = scroll;
+	}
+
+	// Checks tab: badge, one-line summary, list.
+	function showChecks(issues, readyLabel) {
 		var nErr = issues.filter(function (i) { return i.level === 'error'; }).length;
 		var nWarn = issues.filter(function (i) { return i.level === 'warning'; }).length;
 		var nInfo = issues.length - nErr - nWarn;
@@ -195,11 +282,23 @@
 		$counts.innerHTML = flagged
 			? '<strong>' + [nErr ? plural(nErr, 'error') : '', nWarn ? plural(nWarn, 'warning') : ''].filter(Boolean).join(' and ') + ' to fix</strong>' +
 				(notes ? '<span>Plus ' + notes + '</span>' : '')
-			: '<strong>Ready for wordpress.org</strong><span>' + (notes ? 'Nothing blocking. ' + notes : 'No problems found.') + '</span>';
+			: '<strong>' + readyLabel + '</strong><span>' + (notes ? 'Nothing blocking. ' + notes : 'No problems found.') + '</span>';
 		var SEV = { error: 'Error', warning: 'Warning', info: 'Note' };
 		$issues.innerHTML = issues.map(function (i) {
 			return '<li class="' + i.level + '"><span class="sev">' + SEV[i.level] + '</span><span>' + i.msg + '</span></li>';
 		}).join('');
+	}
+
+	function render() {
+		var text = editor.get();
+		if (state.app !== 'wp') return renderMarkdown(text);
+
+		var r = W.parse(text);
+		var h = r.headers;
+		var name = r.name || 'Untitled plugin';
+		state.parsed = r;
+
+		showChecks(W.validate(r, assets), APPS.wp.ready);
 
 		/* search card */
 		var short = r.short || '';
@@ -448,14 +547,15 @@
 	document.getElementById('file-assets').onchange = function () { handleFiles(this.files); this.value = ''; };
 	document.getElementById('btn-sample').onclick = function () {
 		var current = editor.get();
-		if (!link && current.trim() && current !== SAMPLE && !confirm('Replace the current text with the sample readme?')) return;
+		var sample = state.app === 'wp' ? SAMPLE : SAMPLE_MD;
+		if (!link && current.trim() && current !== SAMPLE && current !== SAMPLE_MD && !confirm('Replace the current text with the sample readme?')) return;
 		unlink(true);
-		editor.set(SAMPLE);
+		editor.set(sample);
 		render();
 		saveText();
 	};
 	document.getElementById('btn-copy').onclick = function () {
-		var el = $preview.querySelector('.wporg');
+		var el = $preview.querySelector('.wporg, .markdown-body, .plain-doc');
 		var btn = this;
 		if (!el || !navigator.clipboard) return;
 		navigator.clipboard.writeText(el.outerHTML).then(function () {
@@ -532,6 +632,7 @@
 		sideTabs.forEach(function (b) { b.setAttribute('aria-selected', b.getAttribute('data-side') === name); });
 		document.querySelectorAll('[data-pane-side]').forEach(function (v) { v.hidden = v.getAttribute('data-pane-side') !== name; });
 		if (name === 'readme') editor.refresh();
+		state.side = name;
 		try { localStorage.setItem(SIDE_KEY, name); } catch (e) {}
 	}
 	sideTabs.forEach(function (b) { b.addEventListener('click', function () { setSide(b.getAttribute('data-side')); }); });
@@ -557,20 +658,46 @@
 		});
 	});
 
+	/* app chooser: WordPress.org / GitHub / Plain */
+	var APP_KEY = 'wp-readme-viewer:app';
+	var appButtons = document.querySelectorAll('[data-app]');
+
+	function setApp(app, quiet) {
+		if (!APPS[app]) app = 'wp';
+		state.app = app;
+		document.body.setAttribute('data-app', app);
+		appButtons.forEach(function (b) { b.setAttribute('aria-checked', b.getAttribute('data-app') === app); });
+		editor.setApp(app);
+		// The search card is a wordpress.org thing.
+		document.querySelector('[data-side="card"]').hidden = app !== 'wp';
+		if (app !== 'wp' && state.side === 'card') setSide('readme');
+		try { localStorage.setItem(APP_KEY, app); } catch (e) {}
+		if (quiet) return;
+		// A linked folder may resolve to a different file (readme.txt vs README.md).
+		if (link) linkTo(link.src);
+		else render();
+	}
+	appButtons.forEach(function (b) {
+		b.addEventListener('click', function () { if (b.getAttribute('data-app') !== state.app) setApp(b.getAttribute('data-app')); });
+	});
+
 	/* init */
-	var saved = null, savedView = null, savedLeft = null, savedSide = null, savedHidden = '';
+	var saved = null, savedView = null, savedLeft = null, savedSide = null, savedHidden = '', savedApp = null;
 	try {
 		saved = localStorage.getItem(STORE_KEY);
 		savedView = localStorage.getItem(VIEW_KEY);
 		savedLeft = localStorage.getItem(WIDTH_KEY);
 		savedSide = localStorage.getItem(SIDE_KEY);
 		savedHidden = localStorage.getItem(BLOCKS_KEY) || '';
+		savedApp = localStorage.getItem(APP_KEY);
 	} catch (e) {}
+	savedApp = new URLSearchParams(location.search).get('app') || savedApp;
 	toggles.forEach(function (t) { t.setAttribute('aria-pressed', savedHidden.split(',').indexOf(t.getAttribute('data-block')) === -1); });
 	applyBlocks(false);
 	if (savedLeft) setLeft(+savedLeft, false);
 	if (savedSide) setSide(savedSide);
-	editor.set(saved != null ? saved : SAMPLE);
+	setApp(savedApp || 'wp', true);
+	editor.set(saved != null ? saved : state.app === 'wp' ? SAMPLE : SAMPLE_MD);
 	if (savedView) setView(savedView);
 	render();
 
@@ -621,11 +748,11 @@
 		var segs = src.replace(/[\\/]+$/, '').split(/[\\/]/);
 		var last = segs[segs.length - 1];
 		if (/\.(txt|md|markdown)$/i.test(last)) return { main: segs[segs.length - 2] || last, sub: '/ ' + last };
-		return { main: last, sub: '/ readme.txt' };
+		return { main: last, sub: '/ ' + APPS[state.app].file };
 	}
 
 	function setPill(state, stateText) {
-		var d = describe(link ? link.src : '');
+		var d = describe(link ? (link.file || link.src) : '');
 		$pill.setAttribute('data-state', state);
 		$pillMain.textContent = d.main;
 		$pillSub.textContent = d.sub;
@@ -673,6 +800,8 @@
 		editor.set(p.text);
 		editor.setScroll(top);
 		if (p.assets) setLinkedAssets(p.assets);
+		mine.file = p.file || '';
+		state.base = p.file ? { kind: 'file', dir: p.file.replace(/[\\/][^\\/]*$/, '') } : p.url ? { kind: 'url', url: p.url } : null;
 		render();
 		var time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 		var n = p.assets ? Object.keys(p.assets).length : 0;
@@ -691,6 +820,7 @@
 			clearInterval(link.timer);
 		}
 		link = null;
+		state.base = null;
 		editor.setReadOnly(false);
 		document.body.classList.remove('linked');
 		$unlink.hidden = true;
@@ -710,6 +840,7 @@
 	function directUrl(u) {
 		var m;
 		if ((m = u.match(/^https?:\/\/github\.com\/([^/]+)\/([^/]+)\/blob\/(.+)$/i))) return 'https://raw.githubusercontent.com/' + m[1] + '/' + m[2] + '/' + m[3];
+		if ((m = u.match(/^https?:\/\/github\.com\/([^/]+)\/([^/#?]+?)(?:\.git)?\/?$/i))) return 'https://raw.githubusercontent.com/' + m[1] + '/' + m[2] + '/HEAD/' + APPS[state.app].file;
 		if ((m = u.match(/^https?:\/\/(?:[\w-]+\.)?wordpress\.org\/plugins\/([a-z0-9-]+)/i))) return 'https://plugins.svn.wordpress.org/' + m[1] + '/trunk/readme.txt';
 		return u;
 	}
@@ -737,12 +868,12 @@
 
 		if (hasServer) {
 			var q = encodeURIComponent(src);
-			fetch('api/read?src=' + q, { cache: 'no-store' })
+			fetch('api/read?src=' + q + '&prefer=' + APPS[state.app].prefer, { cache: 'no-store' })
 				.then(function (r) { return r.json().then(function (p) { if (!r.ok) throw new Error(p.error); return p; }); })
 				.then(function (p) {
 					applyPayload(mine, p);
 					if (!mine.live || link !== mine) return;
-					mine.es = new EventSource('api/watch?src=' + q);
+					mine.es = new EventSource('api/watch?src=' + q + '&prefer=' + APPS[state.app].prefer);
 					mine.es.onmessage = function (e) { applyPayload(mine, JSON.parse(e.data)); };
 					mine.es.addEventListener('problem', function (e) { fail(new Error(JSON.parse(e.data).error)); });
 					mine.es.onerror = function () {

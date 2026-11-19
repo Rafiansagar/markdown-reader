@@ -100,9 +100,37 @@
 		if (next !== inner && !inner) selectFrom(cm, { line: l, ch: 0 }, marks.length + 1, 7);
 	}
 
+	// ## Heading and ### Heading for GitHub / Plain Markdown.
+	function mdHeading(cm, hashes) {
+		var l = cm.getCursor().line;
+		var t = cm.getLine(l);
+		var m = t.match(/^\s{0,3}(#{1,6})\s+(.*)$/);
+		var inner = m ? m[2] : t.trim();
+		var next = m && m[1] === hashes ? inner : hashes + ' ' + (inner || 'Heading');
+		cm.replaceRange(next, { line: l, ch: 0 }, { line: l, ch: t.length });
+		if (!inner) selectFrom(cm, { line: l, ch: 0 }, hashes.length + 1, 7);
+	}
+
+	function isWp(cm) { return (cm.state.readmeApp || 'wp') === 'wp'; }
+
+	// Toolbar heading buttons per app.
+	var HEADING_LABELS = {
+		wp: { section: ['==', 'Section: == Title =='], subsection: ['=', 'Subsection or FAQ question: = Title ='] },
+		md: { section: ['##', 'Heading: ## Title'], subsection: ['###', 'Subheading: ### Title'] }
+	};
+
+	function labelToolbar(toolbar, app) {
+		if (!toolbar) return;
+		var set = HEADING_LABELS[app === 'wp' ? 'wp' : 'md'];
+		Object.keys(set).forEach(function (cmd) {
+			var b = toolbar.querySelector('[data-cmd="' + cmd + '"]');
+			if (b) { b.textContent = set[cmd][0]; b.title = set[cmd][1]; }
+		});
+	}
+
 	var COMMANDS = {
-		section: function (cm) { heading(cm, '=='); },
-		subsection: function (cm) { heading(cm, '='); },
+		section: function (cm) { if (isWp(cm)) heading(cm, '=='); else mdHeading(cm, '##'); },
+		subsection: function (cm) { if (isWp(cm)) heading(cm, '='); else mdHeading(cm, '###'); },
 		bold: function (cm) { wrap(cm, '**', 'bold text'); },
 		italic: function (cm) { wrap(cm, '*', 'italic text'); },
 		code: function (cm) { wrap(cm, '`', 'code'); },
@@ -197,7 +225,13 @@
 			focus: function () { cm.focus(); },
 			getScroll: function () { return cm.getScrollInfo().top; },
 			setScroll: function (t) { cm.scrollTo(null, t); },
-			refresh: function () { cm.refresh(); }
+			refresh: function () { cm.refresh(); },
+			// 'wp' = readme.txt syntax on top of Markdown; 'github' / 'plain' = Markdown only
+			setApp: function (app) {
+				cm.state.readmeApp = app;
+				cm.setOption('mode', app === 'wp' ? 'wp-readme' : { name: 'markdown', highlightFormatting: true });
+				labelToolbar(toolbar, app);
+			}
 		};
 	}
 
@@ -221,7 +255,8 @@
 			focus: function () { ta.focus(); },
 			getScroll: function () { return ta.scrollTop; },
 			setScroll: function (t) { ta.scrollTop = t; },
-			refresh: function () {}
+			refresh: function () {},
+			setApp: function () {}
 		};
 	}
 

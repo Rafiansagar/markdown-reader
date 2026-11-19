@@ -45,10 +45,18 @@ const MIME = {
 	'.jpeg': 'image/jpeg',
 	'.gif': 'image/gif',
 	'.svg': 'image/svg+xml',
-	'.webp': 'image/webp'
+	'.webp': 'image/webp',
+	'.avif': 'image/avif',
+	'.ico': 'image/x-icon',
+	'.bmp': 'image/bmp'
 };
 const ASSET_RE = /^(banner-(?:772x250|1544x500)|icon-(?:128x128|256x256)|icon|screenshot-\d+)\.(png|jpe?g|gif|svg|webp)$/i;
-const README_NAMES = ['readme.txt', 'readme.md'];
+// Which file a folder resolves to, per app: wordpress.org reads readme.txt, GitHub README.md.
+const README_NAMES = {
+	txt: ['readme.txt', 'readme.md', 'readme.markdown'],
+	md: ['readme.md', 'readme.markdown', 'readme.txt']
+};
+const IMAGE_RE = /\.(png|jpe?g|gif|svg|webp|avif|ico|bmp)$/i;
 
 /* ---------- helpers ---------- */
 
@@ -81,7 +89,7 @@ async function fetchText(url) {
 }
 
 // Turns page URLs into the raw readme they show.
-function normalizeUrl(u) {
+function normalizeUrl(u, prefer) {
 	let m;
 	if ((m = u.match(/^https?:\/\/(?:[\w-]+\.)?wordpress\.org\/plugins\/([a-z0-9-]+)/i))) {
 		return { url: `https://plugins.svn.wordpress.org/${m[1]}/trunk/readme.txt`, wpSlug: m[1].toLowerCase() };
@@ -95,25 +103,25 @@ function normalizeUrl(u) {
 		return { url: `https://raw.githubusercontent.com/${m[1]}/${m[2]}/${m[3]}` };
 	}
 	if ((m = u.match(/^https?:\/\/github\.com\/([^/]+)\/([^/#?]+?)(?:\.git)?\/?$/i))) {
-		return { url: `https://raw.githubusercontent.com/${m[1]}/${m[2]}/HEAD/readme.txt` };
+		return { url: `https://raw.githubusercontent.com/${m[1]}/${m[2]}/HEAD/${prefer === 'md' ? 'README.md' : 'readme.txt'}` };
 	}
 	return { url: u };
 }
 
-async function findReadme(dir) {
+async function findReadme(dir, prefer) {
 	const names = await fsp.readdir(dir);
-	for (const want of README_NAMES) {
+	for (const want of README_NAMES[prefer === 'md' ? 'md' : 'txt']) {
 		const hit = names.find((n) => n.toLowerCase() === want);
 		if (hit) return path.join(dir, hit);
 	}
 	return null;
 }
 
-async function resolveSource(src) {
+async function resolveSource(src, prefer) {
 	src = String(src || '').trim().replace(/^["']+|["']+$/g, '');
 	if (!src) throw new Error('Enter a file, a plugin folder or a URL.');
 
-	if (/^https?:\/\//i.test(src)) return Object.assign({ kind: 'url', label: src }, normalizeUrl(src));
+	if (/^https?:\/\//i.test(src)) return Object.assign({ kind: 'url', label: src }, normalizeUrl(src, prefer));
 
 	if (/^file:\/\//i.test(src)) src = fileURLToPath(src);
 	let p = path.resolve(src);
@@ -124,8 +132,8 @@ async function resolveSource(src) {
 		throw new Error('Not found: ' + p);
 	}
 	if (st.isDirectory()) {
-		const f = await findReadme(p);
-		if (!f) throw new Error('No readme.txt in ' + p);
+		const f = await findReadme(p, prefer);
+		if (!f) throw new Error('No ' + (prefer === 'md' ? 'README.md' : 'readme.txt') + ' in ' + p);
 		p = f;
 	}
 	return { kind: 'file', file: p, label: p };
@@ -183,19 +191,19 @@ async function readSource(s) {
 
 /* ---------- handlers ---------- */
 
-async function handleRead(res, src) {
+async function handleRead(res, src, prefer) {
 	try {
-		const s = await resolveSource(src);
+		const s = await resolveSource(src, prefer);
 		send(res, 200, await readSource(s));
 	} catch (e) {
 		send(res, 400, { error: e.message });
 	}
 }
 
-async function handleWatch(req, res, src) {
+async function handleWatch(req, res, src, prefer) {
 	let s;
 	try {
-		s = await resolveSource(src);
+		s = await resolveSource(src, prefer);
 	} catch (e) {
 		return send(res, 400, { error: e.message });
 	}
@@ -253,6 +261,15 @@ async function handleWatch(req, res, src) {
 	});
 
 	push();
+}
+
+// Images a README points to with a relative path (docs/screenshot.png). Images only.
+function handleFile(res, p) {
+	if (!p || !path.isAbsolute(p) || !IMAGE_RE.test(p)) return send(res, 400, { error: 'Only image files can be served.' });
+	fs.readFile(p, (err, buf) => {
+		if (err) return send(res, 404, { error: 'Not found.' });
+		send(res, 200, buf, MIME[path.extname(p).toLowerCase()] || 'application/octet-stream');
+	});
 }
 
 function handleAsset(res, p) {
@@ -325,8 +342,9 @@ const server = http.createServer((req, res) => {
 
 	switch (u.pathname) {
 		case '/api/ping': return send(res, 200, { ok: true });
-		case '/api/read': return handleRead(res, u.searchParams.get('src'));
-		case '/api/watch': return handleWatch(req, res, u.searchParams.get('src'));
+		case '/api/read': return handleRead(res, u.searchParams.get('src'), u.searchParams.get('prefer'));
+		case '/api/watch': return handleWatch(req, res, u.searchParams.get('src'), u.searchParams.get('prefer'));
+		case '/api/file': return handleFile(res, u.searchParams.get('path'));
 		case '/api/asset': return handleAsset(res, u.searchParams.get('path'));
 	}
 	send(res, 404, { error: 'Not found.' });

@@ -99,8 +99,15 @@
 	}
 }
 
-// Show toggles: Header / Tabs / Sidebar.
+// Show toggles: Header / Tabs / Sidebar (wordpress.org only).
 body {
+	&:not([data-app="wp"]) .preview-bar {
+		.bar-label,
+		.toggle {
+			display: none;
+		}
+	}
+
 	&.hide-header {
 		.wp-banner,
 		.wp-header {

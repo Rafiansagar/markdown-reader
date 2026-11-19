@@ -1,0 +1,12 @@
+// WP Readme Viewer styles.
+// Edit the partials here; style.css in the project root is compiled from this file.
+// npm start compiles it and recompiles on every save; npm run build compiles once.
+
+@use "tokens";
+@use "base";
+@use "buttons";
+@use "topbar";
+@use "workspace";
+@use "editor-pane";
+@use "preview-pane";
+@use "wporg";

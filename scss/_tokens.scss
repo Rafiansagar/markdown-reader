@@ -1,0 +1,57 @@
+@use "sass:map";
+
+// Design tokens and shared helpers.
+// Colors stay as CSS custom properties so they can be inspected and tweaked in the browser.
+
+$breakpoints: (
+	md: 900px,
+	sm: 600px
+);
+
+// @include bp(md) { … } -> max-width media query
+@mixin bp($name) {
+	@media (max-width: map.get($breakpoints, $name)) {
+		@content;
+	}
+}
+
+@mixin reduced-motion {
+	@media (prefers-reduced-motion: reduce) {
+		@content;
+	}
+}
+
+@mixin code-chip($bg: #eef0f3, $pad: 1px 4px) {
+	font: 12px var(--mono);
+	background: $bg;
+	padding: $pad;
+	border-radius: 3px;
+}
+
+:root {
+	// app chrome
+	--graphite: #22262b;
+	--fog: #eceff2;
+	--paper: #ffffff;
+	--paper-dim: #f7f8fa;
+	--rule: #d5dae0;
+	--rule-strong: #b9c0c8;
+	--slate: #5d6773;
+	--directory: #3858e9;
+	--pass: #1e8449;
+	--pass-bg: #e3f3ea;
+	--caution: #9a6100;
+	--caution-dot: #e0a526;
+	--fail: #c0352b;
+	--fail-bg: #fbe9e7;
+	--ui: "Instrument Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+	--mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Consolas, monospace;
+
+	// wordpress.org preview
+	--wp-blue: #3858e9;
+	--wp-blue-dark: #2145e6;
+	--wp-text: #1e1e1e;
+	--wp-muted: #656a71;
+	--wp-line: #d9d9d9;
+	--wp-soft: #f6f6f6;
+}

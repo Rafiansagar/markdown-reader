@@ -4,9 +4,14 @@
   "private": true,
   "description": "Preview a WordPress readme.txt the way wordpress.org shows it, live from a file, plugin folder or URL.",
   "scripts": {
-    "start": "node server.js --open"
+    "start": "node server.js --open",
+    "build": "sass --no-source-map --style=expanded scss/style.scss style.css",
+    "watch": "sass --no-source-map --style=expanded --watch scss/style.scss:style.css"
   },
   "engines": {
     "node": ">=18"
+  },
+  "devDependencies": {
+    "sass": "^1.108.2"
   }
 }

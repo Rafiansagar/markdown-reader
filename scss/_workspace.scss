@@ -1,0 +1,66 @@
+@use "tokens" as *;
+
+// Two-pane grid, the resize gutter, and the Editor / Split / Preview modes.
+
+.workspace {
+	flex: 1;
+	display: grid;
+	grid-template-columns: var(--left, 38%) 9px minmax(0, 1fr);
+	min-height: 0;
+
+	body[data-view="preview"] &,
+	body[data-view="edit"] & {
+		grid-template-columns: minmax(0, 1fr);
+	}
+
+	@include bp(md) {
+		grid-template-columns: minmax(0, 1fr) !important;
+	}
+}
+
+body[data-view="preview"] {
+	.editor-pane,
+	.gutter {
+		display: none;
+	}
+}
+
+body[data-view="edit"] {
+	.gutter,
+	.preview-pane {
+		display: none;
+	}
+}
+
+.gutter {
+	position: relative;
+	cursor: col-resize;
+	background: var(--fog);
+	touch-action: none;
+
+	&::after {
+		content: "";
+		position: absolute;
+		top: 50%;
+		left: 50%;
+		width: 3px;
+		height: 36px;
+		border-radius: 2px;
+		transform: translate(-50%, -50%);
+		background: var(--rule-strong);
+	}
+
+	&:hover::after,
+	&:focus-visible::after,
+	body.resizing &::after {
+		background: var(--directory);
+	}
+
+	&:focus-visible {
+		outline-offset: -2px;
+	}
+
+	@include bp(md) {
+		display: none;
+	}
+}

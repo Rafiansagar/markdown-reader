@@ -1,0 +1,48 @@
+@use "tokens" as *;
+
+.btn {
+	appearance: none;
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	padding: 7px 12px;
+	border: 1px solid var(--rule);
+	border-radius: 6px;
+	background: var(--paper);
+	font-size: 13px;
+	font-weight: 500;
+	cursor: pointer;
+	white-space: nowrap;
+
+	&:hover {
+		border-color: var(--rule-strong);
+		background: var(--paper-dim);
+	}
+
+	&-primary {
+		background: var(--graphite);
+		border-color: var(--graphite);
+		color: #fff;
+
+		&:hover {
+			background: #3a4048;
+			border-color: #3a4048;
+		}
+	}
+
+	&-quiet {
+		border-color: transparent;
+		background: transparent;
+		color: var(--slate);
+
+		&:hover {
+			background: rgba(34, 38, 43, 0.06);
+			border-color: transparent;
+			color: var(--graphite);
+		}
+	}
+
+	&-danger {
+		color: var(--fail);
+	}
+}

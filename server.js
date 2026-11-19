@@ -9,6 +9,9 @@
  * It serves the viewer and lets it read any readme on this PC (file or plugin
  * folder) or on the web (any URL, no CORS limits), and pushes changes live.
  * Listens on 127.0.0.1 only.
+ *
+ * When the `sass` package is installed (npm install), it also compiles
+ * scss/style.scss to style.css on start and again whenever a .scss file changes.
  */
 'use strict';
 
@@ -259,6 +262,51 @@ function handleAsset(res, p) {
 	});
 }
 
+/* ---------- styles: scss/ -> style.css ---------- */
+
+const SCSS_DIR = path.join(ROOT, 'scss');
+const SCSS_ENTRY = path.join(SCSS_DIR, 'style.scss');
+const CSS_OUT = path.join(ROOT, 'style.css');
+
+function startStyles() {
+	if (!fs.existsSync(SCSS_ENTRY)) return;
+	let sass;
+	try {
+		sass = require('sass');
+	} catch (e) {
+		console.log('Styles: "sass" is not installed, serving the existing style.css. Run npm install to compile scss/.');
+		return;
+	}
+
+	function build() {
+		const t = Date.now();
+		try {
+			const { css } = sass.compile(SCSS_ENTRY, { style: 'expanded' });
+			const out = '/* Compiled from scss/style.scss. Edit the .scss files, not this one. */\n' + css + '\n';
+			let current = '';
+			try { current = fs.readFileSync(CSS_OUT, 'utf8'); } catch (e) { /* first build */ }
+			if (out !== current) fs.writeFileSync(CSS_OUT, out);
+			console.log(`Styles: compiled style.css in ${Date.now() - t} ms`);
+		} catch (e) {
+			// Keep the last good style.css and keep serving.
+			console.error('Styles: SCSS error, style.css not updated.\n' + (e.message || e));
+		}
+	}
+
+	build();
+	let debounce;
+	try {
+		fs.watch(SCSS_DIR, { recursive: true }, (event, name) => {
+			if (name && !/\.scss$/i.test(name)) return;
+			clearTimeout(debounce);
+			debounce = setTimeout(build, 100);
+		});
+		console.log('Styles: watching scss/ for changes.');
+	} catch (e) {
+		console.log('Styles: could not watch scss/ (' + e.message + '). Restart to pick up changes.');
+	}
+}
+
 /* ---------- server ---------- */
 
 const server = http.createServer((req, res) => {
@@ -291,6 +339,8 @@ server.on('error', (e) => {
 	}
 	process.exit(1);
 });
+
+startStyles();
 
 server.listen(PORT, HOST, () => {
 	const url = `http://localhost:${PORT}/`;

@@ -1,0 +1,135 @@
+@use "tokens" as *;
+
+// Right pane: Show toggles, Copy HTML, scrolling preview, drop overlay.
+
+.preview-pane {
+	display: flex;
+	flex-direction: column;
+	min-width: 0;
+	min-height: 0;
+	background: var(--paper);
+}
+
+.preview-bar {
+	flex: none;
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	flex-wrap: wrap;
+	padding: 7px 12px 7px 16px;
+	border-bottom: 1px solid var(--rule);
+	font-size: 13px;
+
+	.bar-label {
+		color: var(--slate);
+		margin-right: 4px;
+	}
+
+	.btn {
+		margin-left: auto;
+	}
+}
+
+.toggle {
+	appearance: none;
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	padding: 4px 11px;
+	border: 1px solid var(--rule);
+	border-radius: 999px;
+	background: var(--paper);
+	font-size: 13px;
+	font-weight: 500;
+	color: var(--slate);
+	cursor: pointer;
+
+	&::before {
+		content: "";
+		width: 7px;
+		height: 7px;
+		border-radius: 50%;
+		border: 1.5px solid currentColor;
+	}
+
+	&:hover {
+		border-color: var(--rule-strong);
+		color: var(--graphite);
+	}
+
+	&[aria-pressed="true"] {
+		background: var(--graphite);
+		border-color: var(--graphite);
+		color: #fff;
+
+		&::before {
+			background: currentColor;
+		}
+	}
+}
+
+.preview-scroll {
+	flex: 1;
+	min-height: 0;
+	overflow: auto;
+	position: relative;
+
+	@include bp(md) {
+		overflow: visible;
+	}
+}
+
+.drop-overlay {
+	position: fixed;
+	inset: 12px;
+	z-index: 50;
+	display: none;
+	align-items: center;
+	justify-content: center;
+	background: rgba(56, 88, 233, 0.08);
+	border: 2px dashed var(--directory);
+	border-radius: 14px;
+	font-size: 18px;
+	font-weight: 600;
+	color: var(--directory);
+	pointer-events: none;
+
+	body.dragging & {
+		display: flex;
+	}
+}
+
+// Show toggles: Header / Tabs / Sidebar.
+body {
+	&.hide-header {
+		.wp-banner,
+		.wp-header,
+		.short-desc {
+			display: none;
+		}
+	}
+
+	&.hide-tabs {
+		.wp-tabs {
+			display: none;
+		}
+
+		.wp-grid {
+			margin-top: 32px;
+		}
+	}
+
+	&.hide-sidebar {
+		.wp-meta {
+			display: none;
+		}
+
+		.wp-grid {
+			grid-template-columns: minmax(0, 1fr);
+		}
+	}
+
+	&.hide-header.hide-tabs .wp-grid {
+		margin-top: 0;
+	}
+}

@@ -1,3 +1,4 @@
+/* Compiled from scss/style.scss. Edit the .scss files, not this one. */
 :root {
   --graphite: #22262b;
   --fog: #eceff2;
@@ -717,6 +718,216 @@ body.linked #src {
   background: #fcf0c3;
   text-decoration: line-through;
   text-decoration-color: rgba(0, 0, 0, 0.35);
+}
+
+.editor-toolbar {
+  flex: none;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 2px;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--rule);
+  background: var(--paper);
+}
+.editor-toolbar button {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 30px;
+  height: 28px;
+  padding: 0 7px;
+  border: 0;
+  border-radius: 5px;
+  background: none;
+  color: var(--slate);
+  cursor: pointer;
+}
+.editor-toolbar button svg {
+  width: 16px;
+  height: 16px;
+}
+.editor-toolbar button.glyph {
+  font: 600 13px/1 var(--mono);
+  font-variant-ligatures: none;
+}
+.editor-toolbar button.glyph i {
+  font-family: Georgia, serif;
+  font-size: 15px;
+}
+.editor-toolbar button:hover:not(:disabled) {
+  background: rgba(34, 38, 43, 0.07);
+  color: var(--graphite);
+}
+.editor-toolbar button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.editor-toolbar .tb-sep {
+  width: 1px;
+  height: 18px;
+  margin: 0 6px;
+  background: var(--rule);
+}
+.editor-toolbar .cursor-pos {
+  margin-left: auto;
+  padding-left: 8px;
+  font: 12px var(--mono);
+  color: var(--slate);
+  white-space: nowrap;
+}
+
+/* ---------- CodeMirror ---------- */
+.side-view .CodeMirror {
+  flex: 1 1 0;
+  height: auto;
+  min-height: 240px;
+}
+@media (max-width: 900px) {
+  .side-view .CodeMirror {
+    flex: none;
+    height: 55vh;
+  }
+}
+
+.cm-s-readme.CodeMirror {
+  font: 13px/1.7 var(--mono);
+  font-variant-ligatures: none;
+  font-feature-settings: "liga" 0, "calt" 0;
+  color: var(--graphite);
+  background: var(--paper);
+}
+body.linked .cm-s-readme.CodeMirror {
+  background: var(--paper-dim);
+  color: #454c55;
+}
+.cm-s-readme .CodeMirror-lines {
+  padding: 14px 0;
+}
+.cm-s-readme pre.CodeMirror-line,
+.cm-s-readme pre.CodeMirror-line-like {
+  padding: 0 18px 0 12px;
+}
+.cm-s-readme .CodeMirror-gutters {
+  background: inherit;
+  border-right: 1px solid #edf0f3;
+}
+.cm-s-readme .CodeMirror-linenumber {
+  min-width: 22px;
+  padding: 0 8px 0 10px;
+  font-size: 11px;
+  color: #a3abb5;
+}
+.cm-s-readme .CodeMirror-activeline-background {
+  background: #f3f5f8;
+}
+.cm-s-readme .CodeMirror-activeline .CodeMirror-gutter-elt {
+  color: var(--graphite);
+}
+.cm-s-readme .CodeMirror-cursor {
+  border-left: 2px solid var(--directory);
+}
+.cm-s-readme.is-readonly .CodeMirror-cursors {
+  display: none;
+}
+.cm-s-readme.is-readonly .CodeMirror-activeline-background {
+  background: transparent;
+}
+.cm-s-readme .CodeMirror-selected {
+  background: rgba(56, 88, 233, 0.12);
+}
+.cm-s-readme.CodeMirror-focused .CodeMirror-selected,
+.cm-s-readme .CodeMirror-line::selection,
+.cm-s-readme .CodeMirror-line > span::selection,
+.cm-s-readme .CodeMirror-line > span > span::selection {
+  background: rgba(56, 88, 233, 0.2);
+}
+.cm-s-readme .CodeMirror-placeholder {
+  color: #a3abb5;
+}
+.cm-s-readme .cm-wp-title {
+  color: var(--graphite);
+  font-weight: 600;
+  background: #eef1fd;
+}
+.cm-s-readme .cm-wp-section {
+  color: var(--directory);
+  font-weight: 600;
+}
+.cm-s-readme .cm-wp-sub {
+  color: #6b3fb8;
+  font-weight: 600;
+}
+.cm-s-readme .cm-wp-key {
+  color: var(--pass);
+}
+.cm-s-readme .cm-header {
+  color: var(--directory);
+  font-weight: 600;
+}
+.cm-s-readme .cm-strong {
+  font-weight: 600;
+}
+.cm-s-readme .cm-em {
+  font-style: italic;
+}
+.cm-s-readme .cm-link {
+  color: var(--directory);
+}
+.cm-s-readme .cm-url,
+.cm-s-readme .cm-string.cm-url {
+  color: var(--slate);
+}
+.cm-s-readme .cm-comment {
+  color: #a3392e;
+}
+.cm-s-readme .cm-quote {
+  color: var(--slate);
+  font-style: italic;
+}
+.cm-s-readme .cm-variable-2,
+.cm-s-readme .cm-variable-3,
+.cm-s-readme .cm-keyword {
+  color: inherit;
+}
+.cm-s-readme .cm-formatting-list {
+  color: var(--caution);
+  font-weight: 600;
+}
+.cm-s-readme .cm-formatting-strong,
+.cm-s-readme .cm-formatting-em,
+.cm-s-readme .cm-formatting-code,
+.cm-s-readme .cm-formatting-link,
+.cm-s-readme .cm-formatting-link-string {
+  color: #9aa3ad;
+}
+.cm-s-readme .cm-hr {
+  color: var(--rule-strong);
+}
+
+.CodeMirror-dialog {
+  padding: 6px 12px;
+  font: 13px var(--ui);
+  background: var(--paper-dim);
+}
+.CodeMirror-dialog-top {
+  border-bottom: 1px solid var(--rule);
+}
+.CodeMirror-dialog input {
+  width: 16em;
+  padding: 3px 6px;
+  border: 1px solid var(--rule-strong);
+  border-radius: 4px;
+  font: 12px var(--mono);
+  background: var(--paper);
+}
+.CodeMirror-dialog .CodeMirror-search-hint {
+  color: var(--slate);
+}
+
+.cm-searching {
+  background: rgba(224, 165, 38, 0.3);
 }
 
 .preview-pane {

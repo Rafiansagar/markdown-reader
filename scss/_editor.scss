@@ -1,0 +1,260 @@
+@use "tokens" as *;
+
+// Readme editor: formatting toolbar + CodeMirror theme ("readme").
+// The plain #src textarea styles in _editor-pane.scss are the fallback.
+
+.editor-toolbar {
+	flex: none;
+	display: flex;
+	align-items: center;
+	flex-wrap: wrap;
+	gap: 2px;
+	padding: 6px 10px;
+	border-bottom: 1px solid var(--rule);
+	background: var(--paper);
+
+	button {
+		appearance: none;
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		min-width: 30px;
+		height: 28px;
+		padding: 0 7px;
+		border: 0;
+		border-radius: 5px;
+		background: none;
+		color: var(--slate);
+		cursor: pointer;
+
+		svg {
+			width: 16px;
+			height: 16px;
+		}
+
+		&.glyph {
+			font: 600 13px/1 var(--mono);
+			font-variant-ligatures: none;
+
+			i {
+				font-family: Georgia, serif;
+				font-size: 15px;
+			}
+		}
+
+		&:hover:not(:disabled) {
+			background: rgba(34, 38, 43, 0.07);
+			color: var(--graphite);
+		}
+
+		&:disabled {
+			opacity: 0.4;
+			cursor: default;
+		}
+	}
+
+	.tb-sep {
+		width: 1px;
+		height: 18px;
+		margin: 0 6px;
+		background: var(--rule);
+	}
+
+	.cursor-pos {
+		margin-left: auto;
+		padding-left: 8px;
+		font: 12px var(--mono);
+		color: var(--slate);
+		white-space: nowrap;
+	}
+}
+
+/* ---------- CodeMirror ---------- */
+
+.side-view .CodeMirror {
+	flex: 1 1 0;
+	height: auto;
+	min-height: 240px;
+
+	@include bp(md) {
+		flex: none;
+		height: 55vh;
+	}
+}
+
+.cm-s-readme {
+	&.CodeMirror {
+		font: 13px/1.7 var(--mono);
+		font-variant-ligatures: none;
+		font-feature-settings: "liga" 0, "calt" 0;
+		color: var(--graphite);
+		background: var(--paper);
+
+		body.linked & {
+			background: var(--paper-dim);
+			color: #454c55;
+		}
+	}
+
+	.CodeMirror-lines {
+		padding: 14px 0;
+	}
+
+	pre.CodeMirror-line,
+	pre.CodeMirror-line-like {
+		padding: 0 18px 0 12px;
+	}
+
+	.CodeMirror-gutters {
+		background: inherit;
+		border-right: 1px solid #edf0f3;
+	}
+
+	.CodeMirror-linenumber {
+		min-width: 22px;
+		padding: 0 8px 0 10px;
+		font-size: 11px;
+		color: #a3abb5;
+	}
+
+	.CodeMirror-activeline-background {
+		background: #f3f5f8;
+	}
+
+	.CodeMirror-activeline .CodeMirror-gutter-elt {
+		color: var(--graphite);
+	}
+
+	.CodeMirror-cursor {
+		border-left: 2px solid var(--directory);
+	}
+
+	&.is-readonly {
+		.CodeMirror-cursors {
+			display: none;
+		}
+
+		.CodeMirror-activeline-background {
+			background: transparent;
+		}
+	}
+
+	.CodeMirror-selected {
+		background: rgba(56, 88, 233, 0.12);
+	}
+
+	&.CodeMirror-focused .CodeMirror-selected,
+	.CodeMirror-line::selection,
+	.CodeMirror-line > span::selection,
+	.CodeMirror-line > span > span::selection {
+		background: rgba(56, 88, 233, 0.2);
+	}
+
+	.CodeMirror-placeholder {
+		color: #a3abb5;
+	}
+
+	// readme structure
+	.cm-wp-title {
+		color: var(--graphite);
+		font-weight: 600;
+		background: #eef1fd;
+	}
+
+	.cm-wp-section {
+		color: var(--directory);
+		font-weight: 600;
+	}
+
+	.cm-wp-sub {
+		color: #6b3fb8;
+		font-weight: 600;
+	}
+
+	.cm-wp-key {
+		color: var(--pass);
+	}
+
+	// markdown
+	.cm-header {
+		color: var(--directory);
+		font-weight: 600;
+	}
+
+	.cm-strong {
+		font-weight: 600;
+	}
+
+	.cm-em {
+		font-style: italic;
+	}
+
+	.cm-link {
+		color: var(--directory);
+	}
+
+	.cm-url,
+	.cm-string.cm-url {
+		color: var(--slate);
+	}
+
+	.cm-comment {
+		color: #a3392e;
+	}
+
+	.cm-quote {
+		color: var(--slate);
+		font-style: italic;
+	}
+
+	.cm-variable-2,
+	.cm-variable-3,
+	.cm-keyword {
+		color: inherit;
+	}
+
+	.cm-formatting-list {
+		color: var(--caution);
+		font-weight: 600;
+	}
+
+	.cm-formatting-strong,
+	.cm-formatting-em,
+	.cm-formatting-code,
+	.cm-formatting-link,
+	.cm-formatting-link-string {
+		color: #9aa3ad;
+	}
+
+	.cm-hr {
+		color: var(--rule-strong);
+	}
+}
+
+// Find bar (CodeMirror dialog addon)
+.CodeMirror-dialog {
+	padding: 6px 12px;
+	font: 13px var(--ui);
+	background: var(--paper-dim);
+
+	&-top {
+		border-bottom: 1px solid var(--rule);
+	}
+
+	input {
+		width: 16em;
+		padding: 3px 6px;
+		border: 1px solid var(--rule-strong);
+		border-radius: 4px;
+		font: 12px var(--mono);
+		background: var(--paper);
+	}
+
+	.CodeMirror-search-hint {
+		color: var(--slate);
+	}
+}
+
+.cm-searching {
+	background: rgba(224, 165, 38, 0.3);
+}

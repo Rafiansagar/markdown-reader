@@ -33,6 +33,7 @@ const STATIC = {
 	'/index.html': 'index.html',
 	'/style.css': 'style.css',
 	'/app.js': 'app.js',
+	'/editor.js': 'editor.js',
 	'/readme-parser.js': 'readme-parser.js'
 };
 const MIME = {

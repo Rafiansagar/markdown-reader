@@ -5,6 +5,10 @@
 	var esc = W.esc, md = W.md, inline = W.inline;
 
 	var $src = document.getElementById('src');
+	var editor = window.ReadmeEditor.create($src, {
+		toolbar: document.getElementById('editor-toolbar'),
+		position: document.getElementById('cursor-pos')
+	});
 	var $preview = document.getElementById('preview');
 	var $issues = document.getElementById('issues');
 	var $counts = document.getElementById('counts');
@@ -170,7 +174,7 @@
 	}
 
 	function render() {
-		var text = $src.value;
+		var text = editor.get();
 		var r = W.parse(text);
 		var h = r.headers;
 		var name = r.name || 'Untitled plugin';
@@ -328,22 +332,17 @@
 
 	/* ---------- events ---------- */
 
+	function saveText() {
+		try { localStorage.setItem(STORE_KEY, editor.get()); } catch (e) {}
+	}
+
 	var timer;
-	$src.addEventListener('input', function () {
+	editor.onChange(function () {
 		clearTimeout(timer);
 		timer = setTimeout(function () {
 			render();
-			try { localStorage.setItem(STORE_KEY, $src.value); } catch (e) {}
+			saveText();
 		}, 120);
-	});
-
-	$src.addEventListener('keydown', function (e) {
-		if (e.key === 'Tab' && !e.shiftKey && !e.ctrlKey && !e.metaKey) {
-			e.preventDefault();
-			var s = $src.selectionStart, en = $src.selectionEnd;
-			$src.setRangeText('\t', s, en, 'end');
-			$src.dispatchEvent(new Event('input'));
-		}
 	});
 
 	$preview.addEventListener('click', function (e) {
@@ -383,6 +382,7 @@
 
 	function setView(v) {
 		document.body.setAttribute('data-view', v);
+		editor.refresh();
 		document.querySelectorAll('.seg [data-view]').forEach(function (b) {
 			b.setAttribute('aria-pressed', b.getAttribute('data-view') === v);
 		});
@@ -398,10 +398,10 @@
 		var fr = new FileReader();
 		fr.onload = function () {
 			unlink(true);
-			$src.value = fr.result;
+			editor.set(fr.result);
 			state.openFaq = {};
 			render();
-			try { localStorage.setItem(STORE_KEY, $src.value); } catch (e) {}
+			saveText();
 		};
 		fr.readAsText(file);
 	}
@@ -447,10 +447,12 @@
 	document.getElementById('file-readme').onchange = function () { handleFiles(this.files); this.value = ''; };
 	document.getElementById('file-assets').onchange = function () { handleFiles(this.files); this.value = ''; };
 	document.getElementById('btn-sample').onclick = function () {
-		if (!link && $src.value.trim() && $src.value !== SAMPLE && !confirm('Replace the current text with the sample readme?')) return;
+		var current = editor.get();
+		if (!link && current.trim() && current !== SAMPLE && !confirm('Replace the current text with the sample readme?')) return;
 		unlink(true);
-		$src.value = SAMPLE;
-		$src.dispatchEvent(new Event('input'));
+		editor.set(SAMPLE);
+		render();
+		saveText();
 	};
 	document.getElementById('btn-copy').onclick = function () {
 		var el = $preview.querySelector('.wporg');
@@ -482,6 +484,7 @@
 		var max = $workspace.clientWidth - 320;
 		px = Math.round(Math.max(240, Math.min(px, max)));
 		$workspace.style.setProperty('--left', px + 'px');
+		editor.refresh();
 		$gutter.setAttribute('aria-valuenow', px);
 		if (save) { try { localStorage.setItem(WIDTH_KEY, px); } catch (e) {} }
 	}
@@ -528,6 +531,7 @@
 	function setSide(name) {
 		sideTabs.forEach(function (b) { b.setAttribute('aria-selected', b.getAttribute('data-side') === name); });
 		document.querySelectorAll('[data-pane-side]').forEach(function (v) { v.hidden = v.getAttribute('data-pane-side') !== name; });
+		if (name === 'readme') editor.refresh();
 		try { localStorage.setItem(SIDE_KEY, name); } catch (e) {}
 	}
 	sideTabs.forEach(function (b) { b.addEventListener('click', function () { setSide(b.getAttribute('data-side')); }); });
@@ -566,7 +570,7 @@
 	applyBlocks(false);
 	if (savedLeft) setLeft(+savedLeft, false);
 	if (savedSide) setSide(savedSide);
-	$src.value = saved != null ? saved : SAMPLE;
+	editor.set(saved != null ? saved : SAMPLE);
 	if (savedView) setView(savedView);
 	render();
 
@@ -665,9 +669,9 @@
 
 	function applyPayload(mine, p) {
 		if (link !== mine) return;
-		var top = $src.scrollTop;
-		$src.value = p.text;
-		$src.scrollTop = top;
+		var top = editor.getScroll();
+		editor.set(p.text);
+		editor.setScroll(top);
 		if (p.assets) setLinkedAssets(p.assets);
 		render();
 		var time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
@@ -687,7 +691,7 @@
 			clearInterval(link.timer);
 		}
 		link = null;
-		$src.readOnly = false;
+		editor.setReadOnly(false);
 		document.body.classList.remove('linked');
 		$unlink.hidden = true;
 		if (forget) {
@@ -698,8 +702,8 @@
 
 	function doUnlink() {
 		unlink(true);
-		try { localStorage.setItem(STORE_KEY, $src.value); } catch (e) {}
-		$src.focus();
+		saveText();
+		editor.focus();
 	}
 
 	// Same page-to-raw rewrites as the server, for static mode.
@@ -716,7 +720,7 @@
 		unlink(false);
 		var mine = link = { src: src, live: $live.checked };
 		try { localStorage.setItem(SOURCE_KEY, src); } catch (e) {}
-		$src.readOnly = true;
+		editor.setReadOnly(true);
 		document.body.classList.add('linked');
 		$unlink.hidden = false;
 		setStatus('busy', 'Reading <code>' + esc(src) + '</code>…');
@@ -747,14 +751,14 @@
 				})
 				.catch(function (e) {
 					fail(e);
-					$src.readOnly = false;
+					editor.setReadOnly(false);
 				});
 			return;
 		}
 
 		if (!/^https?:\/\//i.test(src)) {
 			fail(new Error('A folder or file on this PC needs the local server. Run "node server.js" in the viewer folder, then open http://localhost:4321'));
-			$src.readOnly = false;
+			editor.setReadOnly(false);
 			return;
 		}
 
@@ -763,7 +767,7 @@
 			return fetch(url, { cache: 'no-store' })
 				.then(function (r) { if (!r.ok) throw new Error('HTTP ' + r.status + ' for ' + url); return r.text(); })
 				.then(function (t) {
-					if (t !== $src.value || !mine.loaded) {
+					if (t !== editor.get() || !mine.loaded) {
 						mine.loaded = true;
 						applyPayload(mine, { text: t, label: src, url: url, assets: null });
 					}
@@ -773,7 +777,7 @@
 			if (mine.live && link === mine) mine.timer = setInterval(function () { load().catch(fail); }, 5000);
 		}).catch(function (e) {
 			fail(e);
-			$src.readOnly = false;
+			editor.setReadOnly(false);
 		});
 	}
 

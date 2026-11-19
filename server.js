@@ -25,9 +25,16 @@ const ROOT = __dirname;
 const URL_POLL_MS = +process.env.POLL_MS || 4000;
 const FILE_SAFETY_POLL_MS = 3000;
 
-const STATIC = { '/': 'index.html', '/index.html': 'index.html', '/readme-parser.js': 'readme-parser.js' };
+const STATIC = {
+	'/': 'index.html',
+	'/index.html': 'index.html',
+	'/style.css': 'style.css',
+	'/app.js': 'app.js',
+	'/readme-parser.js': 'readme-parser.js'
+};
 const MIME = {
 	'.html': 'text/html; charset=utf-8',
+	'.css': 'text/css; charset=utf-8',
 	'.js': 'text/javascript; charset=utf-8',
 	'.png': 'image/png',
 	'.jpg': 'image/jpeg',

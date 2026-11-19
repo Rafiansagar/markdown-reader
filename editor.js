@@ -69,6 +69,54 @@
 		}
 	}
 
+	// ![alt text](url): selects the URL to type, or the alt text if a URL was selected.
+	function image(cm) {
+		var sel = cm.getSelection();
+		var from = cm.getCursor('from');
+		if (/^(https?:\/\/|\.{0,2}\/|[\w-]+\/)\S*\.(png|jpe?g|gif|svg|webp|avif)$/i.test(sel) || /^https?:\/\/\S+$/.test(sel)) {
+			cm.replaceSelection('![alt text](' + sel + ')');
+			selectFrom(cm, from, 2, 8);
+		} else {
+			var alt = sel || 'alt text';
+			cm.replaceSelection('![' + alt + '](https://)');
+			selectFrom(cm, from, alt.length + 4, 8);
+		}
+	}
+
+	// Table: turns selected tab- or comma-separated lines into a table (first line = header),
+	// otherwise inserts a 2-column starter on its own lines.
+	function table(cm) {
+		var sel = cm.getSelection();
+		var rows = sel.split('\n').filter(function (l) { return l.trim(); });
+		var sep = /\t/.test(sel) ? '\t' : /,/.test(sel) ? ',' : null;
+		var lines;
+		if (sep && rows.length > 1) {
+			var cells = rows.map(function (r) { return r.split(sep).map(function (c) { return c.trim(); }); });
+			var cols = Math.max.apply(null, cells.map(function (c) { return c.length; }));
+			var line = function (c) {
+				var out = [];
+				for (var k = 0; k < cols; k++) out.push(c[k] || '');
+				return '| ' + out.join(' | ') + ' |';
+			};
+			lines = [line(cells[0]), '|' + new Array(cols + 1).join(' --- |')].concat(cells.slice(1).map(line));
+		} else {
+			lines = ['| Column | Column |', '| --- | --- |', '| Cell | Cell |'];
+		}
+
+		// Tables need a blank line before and after.
+		var from = cm.getCursor('from');
+		var to = cm.getCursor('to');
+		var before = '';
+		if (cm.getLine(from.line).slice(0, from.ch).trim()) before = '\n\n'; // text before the cursor
+		else if (from.line > 0 && cm.getLine(from.line - 1).trim()) before = '\n'; // text on the line above
+		var after = '';
+		if (cm.getLine(to.line).slice(to.ch).trim()) after = '\n\n'; // text after the cursor
+		else if (to.line < cm.lastLine() && cm.getLine(to.line + 1).trim()) after = '\n'; // text on the line below
+		var text = lines.join('\n');
+		cm.replaceSelection(before + text + after);
+		if (!sep || rows.length < 2) selectFrom(cm, from, before.length + 2, 6); // first "Column"
+	}
+
 	// Lists: adds the marker to every selected line, or removes it if all have it.
 	function list(cm, ordered) {
 		var re = ordered ? /^(\s*)\d+[.)]\s+/ : /^(\s*)[*+-]\s+/;
@@ -135,6 +183,8 @@
 		italic: function (cm) { wrap(cm, '*', 'italic text'); },
 		code: function (cm) { wrap(cm, '`', 'code'); },
 		link: link,
+		image: image,
+		table: table,
 		bullets: function (cm) { list(cm, false); },
 		numbers: function (cm) { list(cm, true); },
 		// Persistent bar: Enter = next, Shift+Enter = previous, Esc closes.
@@ -179,6 +229,7 @@
 				'Ctrl-B': run('bold'), 'Cmd-B': run('bold'),
 				'Ctrl-I': run('italic'), 'Cmd-I': run('italic'),
 				'Ctrl-K': run('link'), 'Cmd-K': run('link'),
+				'Shift-Ctrl-I': run('image'), 'Shift-Cmd-I': run('image'),
 				'Ctrl-E': run('code'), 'Cmd-E': run('code'),
 				'Ctrl-F': run('find'), 'Cmd-F': run('find')
 			}

@@ -69,6 +69,17 @@
 	}
 }
 
+// Narrow editor pane: drop the cursor position so the buttons keep one line.
+.editor-pane {
+	container-type: inline-size;
+}
+
+@container (max-width: 520px) {
+	.editor-toolbar .cursor-pos {
+		display: none;
+	}
+}
+
 /* ---------- CodeMirror ---------- */
 
 .side-view .CodeMirror {

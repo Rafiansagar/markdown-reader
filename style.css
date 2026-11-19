@@ -824,6 +824,15 @@ body.linked #src {
   white-space: nowrap;
 }
 
+.editor-pane {
+  container-type: inline-size;
+}
+
+@container (max-width: 520px) {
+  .editor-toolbar .cursor-pos {
+    display: none;
+  }
+}
 /* ---------- CodeMirror ---------- */
 .side-view .CodeMirror {
   flex: 1 1 0;

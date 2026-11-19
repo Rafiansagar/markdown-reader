@@ -109,7 +109,8 @@
 		link: link,
 		bullets: function (cm) { list(cm, false); },
 		numbers: function (cm) { list(cm, true); },
-		find: function (cm) { cm.execCommand('find'); }
+		// Persistent bar: Enter = next, Shift+Enter = previous, Esc closes.
+		find: function (cm) { cm.execCommand('findPersistent'); }
 	};
 
 	/* ---------- adapters ---------- */
@@ -123,6 +124,7 @@
 
 		function run(name) {
 			return function (cm) {
+				if (name === 'find') { COMMANDS.find(cm); return; } // works read-only; focusing the editor would close the bar
 				if (cm.getOption('readOnly')) return;
 				COMMANDS[name](cm);
 				cm.focus();
@@ -149,7 +151,8 @@
 				'Ctrl-B': run('bold'), 'Cmd-B': run('bold'),
 				'Ctrl-I': run('italic'), 'Cmd-I': run('italic'),
 				'Ctrl-K': run('link'), 'Cmd-K': run('link'),
-				'Ctrl-E': run('code'), 'Cmd-E': run('code')
+				'Ctrl-E': run('code'), 'Cmd-E': run('code'),
+				'Ctrl-F': run('find'), 'Cmd-F': run('find')
 			}
 		});
 
@@ -189,7 +192,7 @@
 			setReadOnly: function (b) {
 				cm.setOption('readOnly', !!b);
 				cm.getWrapperElement().classList.toggle('is-readonly', !!b);
-				if (toolbar) toolbar.querySelectorAll('[data-cmd]').forEach(function (btn) { btn.disabled = !!b; });
+				if (toolbar) toolbar.querySelectorAll('[data-cmd]').forEach(function (btn) { btn.disabled = !!b && btn.getAttribute('data-cmd') !== 'find'; });
 			},
 			focus: function () { cm.focus(); },
 			getScroll: function () { return cm.getScrollInfo().top; },

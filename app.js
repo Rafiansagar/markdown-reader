@@ -257,10 +257,11 @@
 			return;
 		}
 
-		var body = md(text, { gfm: true, resolve: resolver() });
+		var theme = app === 'github' ? state.ghTheme : 'light';
+		var body = md(text, { gfm: true, resolve: resolver(), theme: theme });
 		var scroll = $preview.scrollTop;
 		$preview.innerHTML = app === 'github'
-			? '<div class="gh-page"><article class="gh-readme">' +
+			? '<div class="gh-page" data-theme="' + theme + '"><article class="gh-readme">' +
 				'<nav class="gh-readme-bar"><span class="gh-readme-tab">' + BOOK_ICON + 'README</span></nav>' +
 				'<div class="markdown-body">' + body + '</div></article></div>'
 			: '<article class="plain-doc">' + body + '</article>';
@@ -680,6 +681,26 @@
 	appButtons.forEach(function (b) {
 		b.addEventListener('click', function () { if (b.getAttribute('data-app') !== state.app) setApp(b.getAttribute('data-app')); });
 	});
+
+	/* GitHub theme: Light / Dark / Dimmed (defaults to the OS setting, like GitHub) */
+	var GH_THEME_KEY = 'wp-readme-viewer:gh-theme';
+	var themeButtons = document.querySelectorAll('[data-gh-theme]');
+
+	function setGhTheme(theme, quiet) {
+		if (!/^(light|dark|dimmed)$/.test(theme)) theme = 'light';
+		state.ghTheme = theme;
+		themeButtons.forEach(function (b) { b.setAttribute('aria-pressed', b.getAttribute('data-gh-theme') === theme); });
+		try { localStorage.setItem(GH_THEME_KEY, theme); } catch (e) {}
+		if (!quiet && state.app === 'github') render();
+	}
+	themeButtons.forEach(function (b) {
+		b.addEventListener('click', function () { setGhTheme(b.getAttribute('data-gh-theme')); });
+	});
+
+	var savedTheme = null;
+	try { savedTheme = localStorage.getItem(GH_THEME_KEY); } catch (e) {}
+	savedTheme = new URLSearchParams(location.search).get('theme') || savedTheme;
+	setGhTheme(savedTheme || (window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'), true);
 
 	/* init */
 	var saved = null, savedView = null, savedLeft = null, savedSide = null, savedHidden = '', savedApp = null;

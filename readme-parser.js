@@ -61,6 +61,95 @@
 		return safeUrl(OPTS.resolve ? OPTS.resolve(url, kind) : url);
 	}
 
+	/* ---------- raw HTML (GitHub mode): allowlist like GitHub's sanitizer ---------- */
+
+	function toSet(list) {
+		var o = {};
+		list.split(' ').forEach(function (k) { o[k] = true; });
+		return o;
+	}
+
+	var HTML_TAGS = toSet('a abbr b bdo blockquote br caption center cite code dd del details dfn div dl dt em figcaption figure ' +
+		'h1 h2 h3 h4 h5 h6 hr i img ins kbd li mark ol p picture pre q rp rt ruby s samp small source span strike strong ' +
+		'sub summary sup table tbody td tfoot th thead time tr tt u ul var wbr');
+	var HTML_VOID = toSet('br hr img source wbr');
+	var HTML_ATTRS = toSet('align alt border cite colspan datetime dir height href lang media open rowspan src srcset start ' +
+		'title type valign width');
+	// Removed together with everything inside them.
+	var HTML_DROP = /^(script|style|iframe|object|embed|noscript|template|textarea|title|head|svg|math|form|select)$/;
+
+	var TAG_RE = /<!--[\s\S]*?(?:-->|$)|<(\/?)([a-zA-Z][\w-]*)((?:\s+[^\s"'=\/>]+(?:\s*=\s*(?:"[^"]*"|'[^']*'|[^\s"'>]+))?)*)\s*(\/?)>/g;
+	var ATTR_RE = /([^\s"'=\/>]+)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'>]+)))?/g;
+
+	function unentity(s) {
+		return s.replace(/&quot;/g, '"').replace(/&#39;|&apos;/g, "'").replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
+	}
+
+	function escText(s) {
+		return s.replace(/&(?!#?\w+;)/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+	}
+
+	function cleanAttrs(raw, tag) {
+		var out = '';
+		var m;
+		ATTR_RE.lastIndex = 0;
+		while ((m = ATTR_RE.exec(raw || ''))) {
+			var name = m[1].toLowerCase();
+			if (!HTML_ATTRS[name]) continue; // drops on*, style, class, id …
+			var hasValue = m[2] !== undefined || m[3] !== undefined || m[4] !== undefined;
+			var v = unentity(m[2] !== undefined ? m[2] : m[3] !== undefined ? m[3] : m[4] || '');
+			if (!hasValue) { out += ' ' + name; continue; }
+			if (name === 'href') v = resolveUrl(v, 'link');
+			else if (name === 'src') v = resolveUrl(v, 'image');
+			else if (name === 'srcset') {
+				v = v.split(',').map(function (part) {
+					var bits = part.trim().split(/\s+/);
+					bits[0] = resolveUrl(bits[0], 'image');
+					return bits.join(' ');
+				}).join(', ');
+			} else if (name === 'media' && tag === 'source' && OPTS.theme) {
+				// <picture> light/dark sources follow the preview theme, not the OS
+				var dark = OPTS.theme !== 'light';
+				if (/prefers-color-scheme:\s*dark/i.test(v)) v = dark ? 'all' : 'not all';
+				else if (/prefers-color-scheme:\s*light/i.test(v)) v = dark ? 'not all' : 'all';
+			}
+			out += ' ' + name + '="' + esc(v) + '"';
+		}
+		return out;
+	}
+
+	// Keeps allowed tags/attributes, escapes everything else as text.
+	function sanitizeHtml(html) {
+		var out = '';
+		var last = 0;
+		var skip = null;
+		var m;
+		TAG_RE.lastIndex = 0;
+		while ((m = TAG_RE.exec(html))) {
+			if (!skip) out += escText(html.slice(last, m.index));
+			last = TAG_RE.lastIndex;
+			if (m[0].slice(0, 4) === '<!--') continue;
+			var closing = m[1] === '/';
+			var name = m[2].toLowerCase();
+			if (skip) {
+				if (closing && name === skip) skip = null;
+				continue;
+			}
+			if (HTML_DROP.test(name)) {
+				if (!closing && !m[4]) skip = name;
+				continue;
+			}
+			if (!HTML_TAGS[name]) continue;
+			if (closing) {
+				if (!HTML_VOID[name]) out += '</' + name + '>';
+				continue;
+			}
+			out += '<' + name + cleanAttrs(m[3], name) + '>';
+		}
+		if (!skip) out += escText(html.slice(last));
+		return out;
+	}
+
 	/* ---------- inline markdown ---------- */
 
 	function emphasis(t) {
@@ -83,6 +172,12 @@
 		s = s.replace(/(`+)([\s\S]*?[^`])\1(?!`)/g, function (_, ticks, code) {
 			return hold('<code>' + esc(code.trim()) + '</code>');
 		});
+		// inline HTML tags (<br>, <img …>, <kbd>, <b> …) in GitHub mode
+		if (OPTS.gfm) {
+			s = s.replace(/<!--[\s\S]*?-->|<\/?[a-zA-Z][\w-]*(?:\s+[^<>]*?)?\s*\/?>/g, function (tag) {
+				return hold(sanitizeHtml(tag));
+			});
+		}
 		// images
 		s = s.replace(/!\[([^\]]*)\]\(\s*([^()\s]+(?:\([^()\s]*\)[^()\s]*)*)(?:\s+"[^"]*")?\s*\)/g, function (_, alt, url) {
 			return hold('<img src="' + esc(resolveUrl(url, 'image')) + '" alt="' + esc(alt) + '">');
@@ -244,6 +339,14 @@
 				while (i < lines.length && lines[i].trim().indexOf(m[1]) !== 0) buf.push(lines[i++]);
 				i++;
 				out.push('<pre><code' + (m[2] ? ' class="language-' + esc(m[2]) + '"' : '') + '>' + esc(dedent(buf).join('\n')) + '</code></pre>');
+				continue;
+			}
+
+			// HTML block (GitHub mode): from a line starting with a tag or comment to the next blank line
+			if (OPTS.gfm && /^\s{0,3}(<\/?[a-zA-Z][\w-]*(\s|\/?>|$)|<!--)/.test(line)) {
+				var html = [];
+				while (i < lines.length && lines[i].trim()) html.push(lines[i++]);
+				out.push(sanitizeHtml(html.join('\n')));
 				continue;
 			}
 
@@ -581,7 +684,7 @@
 		return out;
 	}
 
-	var api = { parse: parse, validate: validate, validateMarkdown: validateMarkdown, md: md, inline: inline, esc: esc };
+	var api = { parse: parse, validate: validate, validateMarkdown: validateMarkdown, md: md, inline: inline, esc: esc, sanitizeHtml: sanitizeHtml };
 	if (typeof module !== 'undefined' && module.exports) module.exports = api;
 	else root.WPReadme = api;
 })(this);

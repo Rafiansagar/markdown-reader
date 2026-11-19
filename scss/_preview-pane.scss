@@ -28,6 +28,20 @@
 	.btn {
 		margin-left: auto;
 	}
+
+	// GitHub theme switch: smaller version of the layout switch
+	.gh-theme {
+		margin-left: 0;
+
+		button {
+			padding: 3px 10px;
+			font-size: 12px;
+		}
+
+		body:not([data-app="github"]) & {
+			display: none;
+		}
+	}
 }
 
 .toggle {

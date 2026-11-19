@@ -289,10 +289,15 @@
 
 		/* page */
 		var banner = assets.bannerHigh || assets.banner;
-		var by = r.contributors.length
-			? 'By <a href="' + profile(r.contributors[0]) + '" target="_blank" rel="noopener">' + esc(r.contributors[0]) + '</a>'
-			: '';
-		
+		// Byline: the readme's Author line, else the first contributor.
+		var by = '';
+		if (h.author) {
+			by = 'By ' + (h.author_uri && /^https?:\/\//i.test(h.author_uri)
+				? '<a href="' + esc(h.author_uri) + '" target="_blank" rel="noopener">' + esc(h.author) + '</a>'
+				: esc(h.author));
+		} else if (r.contributors.length) {
+			by = 'By <a href="' + profile(r.contributors[0]) + '" target="_blank" rel="noopener">' + esc(r.contributors[0]) + '</a>';
+		}
 
 		var tabs = [['details', 'Details'], ['reviews', 'Reviews'], ['installation', 'Installation'], ['development', 'Development']];
 
@@ -305,10 +310,9 @@
 				'<div class="wp-title-wrap"><h1 class="wp-title">' + esc(name) + '</h1><div class="wp-byline">' + by + '</div></div>' +
 				'<a class="wp-download" href="#">Download</a>' +
 			'</header>' +
-			(short ? '<p class="short-desc">' + inline(short) + '</p>' : '') +
 			'<nav class="wp-tabs" role="tablist">' + tabs.map(function (t) {
 				return '<button type="button" role="tab" data-tab="' + t[0] + '" aria-selected="' + (state.tab === t[0]) + '">' + t[1] + '</button>';
-			}).join('') + '<button type="button" class="support" tabindex="-1">Support</button></nav>' +
+			}).join('') + '<a class="support" href="#">Support</a></nav>' +
 			'<div class="wp-grid">' +
 				'<div class="wp-content">' +
 					'<div class="wp-pane" data-pane="details"' + (state.tab === 'details' ? '' : ' hidden') + '>' + details + '</div>' +

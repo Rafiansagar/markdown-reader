@@ -26,6 +26,8 @@
 		'stable tag': 'stable_tag',
 		'license': 'license',
 		'license uri': 'license_uri',
+		'author': 'author',          // not read by wordpress.org; used here for the byline
+		'author uri': 'author_uri',
 		'requires plugins': 'requires_plugins'
 	};
 
@@ -440,6 +442,8 @@
 		if (h.donate_link && !/^https?:\/\//i.test(h.donate_link)) add('warning', '<code>Donate link</code> should be a full URL.');
 
 		r.unknownHeaders.forEach(function (k) { add('info', 'Unknown header “' + esc(k) + '” is ignored.'); });
+		if (h.author) add('info', 'The byline uses <code>Author:</code> from this readme. On wordpress.org it comes from the plugin file’s Author header, so keep the two the same.');
+		if (h.author_uri && !/^https?:\/\//i.test(h.author_uri)) add('warning', '<code>Author URI</code> should be a full URL.');
 
 		if (!r.short) {
 			add('warning', 'No short description. Add one line between the headers and the first section.');

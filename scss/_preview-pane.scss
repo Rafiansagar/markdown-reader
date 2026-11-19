@@ -103,8 +103,7 @@
 body {
 	&.hide-header {
 		.wp-banner,
-		.wp-header,
-		.short-desc {
+		.wp-header {
 			display: none;
 		}
 	}
